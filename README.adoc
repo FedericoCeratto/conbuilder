@@ -1,0 +1,100 @@
+
+== Conbuilder
+
+image:https://img.shields.io/badge/status-alpha-orange.svg[badge]
+image:https://img.shields.io/badge/License-GPL%20v3-blue.svg[badge]
+
+Build Debian packages using overlay FS and systemd namespace containers.
+
+conbuilder creates a base filesystem using debootstrap, then
+overlays it with a filesystem to install the required dependencies
+and finally runs the build on another overlay.
+
+Layers are created, reused and purged automatically to achieve
+fast package builds while minimizing disk usage.
+
+It takes less than 2 seconds to start a new build on an already existing
+overlay.
+
+conbuilder also allows to selectively disable networking,
+system calls and capabilities.
+
+It depends only on the systemd-container package and Python 3
+
+
+.Installation
+[source,bash]
+----
+$ git clone --depth 1 git@github.com:FedericoCeratto/conbuilder.git
+$ cd conbuilder
+$ ./conbuilder.py build -- -b
+$ sudo debi
+$ # in future... sudo apt-get install conbuilder
+----
+
+.Usage
+
+[source,bash]
+----
+usage: conbuilder [-h] [--conf CONF] [--codename CODENAME] [--verbose]
+                     {create,update,build,purge,show}
+                     [extra_args [extra_args ...]]
+
+positional arguments:
+  {create,update,build,purge,show}
+  extra_args
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --conf CONF           Config file path (default:
+                        /home/fede/.config/conbuilder.conf)
+  --codename CODENAME   codename (default: sid)
+  --verbose, -v         increase verbosity up to 3 times
+
+Build Debian packages using overlay FS and systemd namespace containers
+conbuilder creates a base filesystem using debootstrap, then
+overlays it with a filesystem to install the required dependencies
+and finally runs the build on another overlay.
+
+Layers are created, reused and purged automatically to achieve
+fast package builds while minimizing disk usage.
+conbuilder also allows you to selectively disable networking,
+system calls and capabilities.
+
+show:
+    show running containers, filesystem layers and overlay mounts
+
+create:
+    create new base system using debootstrap.
+    Use --codename to pick sid, wheezy etc..
+
+    $ conbuilder create --codename wheezy
+
+update:
+    update base system using debootstrap
+
+    $ conbuilder update --codename wheezy
+
+build:
+    build package using dpkg-buildpackage
+    Creates an overlay called L2 if not already available.
+    Options after '--' will be passed to dpkg-buildpackage
+
+Default configuration:
+--
+
+[DEFAULT]
+config_version = 1
+
+# where all the layers are stored
+cachedir = /var/cache/pbuilder
+
+# purge layer 2 trees older than:
+l2_max_age_days = 30
+
+# *also* purge older layers 2 if there are more than:
+l2_max_number = 10
+
+--
+----
+
