@@ -21,6 +21,8 @@ system calls and capabilities.
 
 It depends only on the systemd-container package and Python 3
 
+conbuilder can be run by a normal user but requires running sudo for
+few commands.
 
 .Installation
 [source,bash]
@@ -87,7 +89,25 @@ Default configuration:
 config_version = 1
 
 # where all the layers are stored
-cachedir = /var/cache/pbuilder
+cachedir = /var/cache/conbuilder
+
+# where to copy the generated .deb .changes .dsc ... files
+export_dir = ../build-area/
+
+tarball_dir = ../tarballs/
+
+# one or more capabilities to drop during the build.
+# L1 and L2 creation is not affected.
+# see man systemd-nspawn
+# drop_capability =
+#
+# Some capabilities that can be disabled with most builds:
+# drop_capability = CAP_CHOWN,CAP_DAC_READ_SEARCH,CAP_FOWNER,CAP_FSETID,CAP_IPC_OWNER,CAP_KILL,CAP_LEASE,CAP_LINUX_IMMUTABLE,CAP_NET_BIND_SERVICE,CAP_NET_BROADCAST,CAP_NET_RAW,CAP_SETGID,CAP_SETFCAP,CAP_SETPCAP,CAP_SETUID,CAP_SYS_ADMIN,CAP_SYS_CHROOT,CAP_SYS_NICE,CAP_SYS_PTRACE,CAP_SYS_TTY_CONFIG,CAP_SYS_RESOURCE,CAP_SYS_BOOT,CAP_AUDIT_WRITE,CAP_AUDIT_CONTROL
+
+# one or more capabilities to drop during the build.
+# L1 and L2 creation is not affected.
+# see man systemd-nspawn
+system_call_filter = ""
 
 # purge layer 2 trees older than:
 l2_max_age_days = 30

@@ -5,6 +5,8 @@
 
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from configparser import ConfigParser
+from glob import glob
+from shutil import copy2
 from subprocess import Popen, PIPE
 import hashlib
 import os
@@ -16,7 +18,25 @@ default_conf = """
 config_version = 1
 
 # where all the layers are stored
-cachedir = /var/cache/pbuilder
+cachedir = /var/cache/conbuilder
+
+# where to copy the generated .deb .changes .dsc ... files
+export_dir = ../build-area/
+
+tarball_dir = ../tarballs/
+
+# one or more capabilities to drop during the build.
+# L1 and L2 creation is not affected.
+# see man systemd-nspawn
+# drop_capability =
+#
+# Some capabilities that can be disabled with most builds:
+# drop_capability = CAP_CHOWN,CAP_DAC_READ_SEARCH,CAP_FOWNER,CAP_FSETID,CAP_IPC_OWNER,CAP_KILL,CAP_LEASE,CAP_LINUX_IMMUTABLE,CAP_NET_BIND_SERVICE,CAP_NET_BROADCAST,CAP_NET_RAW,CAP_SETGID,CAP_SETFCAP,CAP_SETPCAP,CAP_SETUID,CAP_SYS_ADMIN,CAP_SYS_CHROOT,CAP_SYS_NICE,CAP_SYS_PTRACE,CAP_SYS_TTY_CONFIG,CAP_SYS_RESOURCE,CAP_SYS_BOOT,CAP_AUDIT_WRITE,CAP_AUDIT_CONTROL
+
+# one or more capabilities to drop during the build.
+# L1 and L2 creation is not affected.
+# see man systemd-nspawn
+system_call_filter = ""
 
 # purge layer 2 trees older than:
 l2_max_age_days = 30
@@ -99,14 +119,13 @@ def umount(path):
     run("sudo umount {}".format(path))
 
 
-def nspawn(rcmd, quiet=False, drop_capability='', syscall_filter=''):
-    # TODO --drop-capability --system-call-filter
+def nspawn(rcmd, quiet=False, drop_capability='', system_call_filter=''):
     assert isinstance(rcmd, str)
     cmd = "sudo systemd-nspawn -M conbuilder --chdir=/srv "
     if drop_capability:
         cmd += "--drop-capability={} ".format(drop_capability)
-    if syscall_filter:
-        cmd += "--system-call-filter={} ".format(syscall_filter)
+    if system_call_filter:
+        cmd += "--system-call-filter={} ".format(system_call_filter)
     cmd += rcmd
     return run(cmd, quiet=quiet)
 
@@ -170,6 +189,7 @@ def load_conf_and_parse_args():
 
     # generate default conf file if needed
     if args.conf == default_conf_fn and not os.path.isfile(args.conf):
+        print("Configuration file not found. Generating {}".format(args.conf))
         with open(args.conf, 'w') as f:
             f.write(default_conf)
 
@@ -178,6 +198,11 @@ def load_conf_and_parse_args():
         cp.read_file(f)
     args.cachedir = cp['DEFAULT']['cachedir']
     assert args.cachedir not in ('', '/'), "Invalid cache dir"
+    args.export_dir = cp['DEFAULT']['export_dir']
+
+    drop_capability = cp['DEFAULT'].get('drop_capability', '')
+    args.drop_capability = drop_capability.strip().replace(', ', ',')
+    args.system_call_filter = cp['DEFAULT'].get('system_call_filter', '')
     return args
 
 
@@ -234,12 +259,12 @@ def create_l2(conf, l1dir, l2dir, l2workdir, l2mountdir, expected_deps):
 def build(conf):
     """Run a package build
     """
-    build_summary = ""
+    success = False
 
     # L1: base system
     l1dir = os.path.join(conf.cachedir, "l1", conf.codename)
     if not os.path.exists(l1dir):
-        create_l1()
+        create_l1(conf, l1dir)
 
     # L2: build dependencies
 
@@ -269,10 +294,15 @@ def build(conf):
         try:
             mount(l2mountdir, l3dir, l3workdir, l3mountdir)
             run("sudo cp -a . {}".format(os.path.join(l3mountdir, "srv")))
+            # TODO: configurable --private-network
             cmd = "--private-network -D {} -- /usr/bin/dpkg-buildpackage {}"
             cmd = cmd.format(l3mountdir, " ".join(conf.extra_args))
-            nspawn(cmd)
-            build_summary = "[Success] Output is at {}".format(l3dir)
+            nspawn(
+                cmd,
+                drop_capability=conf.drop_capability,
+                system_call_filter=conf.system_call_filter
+            )
+            success = True
 
         finally:
             umount(l3mountdir)
@@ -280,9 +310,22 @@ def build(conf):
     finally:
         umount(l2mountdir)
 
-    if build_summary:
-        print()
-        print(build_summary)
+    if not success:
+        return
+
+    if conf.export_dir:
+        dest = os.path.abspath(conf.export_dir)
+        exts = ("deb", "changes", "xz", "gz", "buildinfo", "dsc")
+        for e in exts:
+            cmd = "cp -a {}/*.{} {}/ || true".format(l3dir, e, dest)
+            run(cmd)
+
+        print("\n[Success]")
+
+    else:
+        print("\n[Success] Output is at {}".format(l3dir))
+
+
 
 
 def show(conf):
