@@ -148,14 +148,14 @@ def _parse_build_deps(out):
     return deps
 
 
-def extract_build_dependencies():
+def extract_build_dependencies(l1dir):
     """Run apt-get build-deps in simulated mode on a read-only FS that
     contains only the base system and the pkg sources
 
     :returns: ([('pkgname', 'version'), ... ], 'fingerprint')
     """
-    cmd = "-D /home/fede/conbuilder/l1/sid/ --read-only " \
-        "--overlay=$(pwd)::/srv  -- /usr/bin/apt-get build-dep -s ."
+    cmd = "-D %s --read-only " % l1dir
+    cmd += "--overlay=$(pwd)::/srv  -- /usr/bin/apt-get build-dep -s ."
     out = nspawn(cmd, quiet=True)
     deps = _parse_build_deps(out)
 
@@ -268,7 +268,7 @@ def build(conf):
 
     # L2: build dependencies
 
-    deps, dep_hash = extract_build_dependencies()
+    deps, dep_hash = extract_build_dependencies(l1dir)
 
     l2dir = os.path.join(conf.cachedir, "l2", "fs", dep_hash)
     l2workdir = os.path.join(conf.cachedir, "l2", "overlay_work", dep_hash)
