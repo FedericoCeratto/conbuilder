@@ -3,15 +3,13 @@
 # Copyright 2017 Federico Ceratto <federico@debian.org>
 # Released under GPLv3 License, see LICENSE file
 
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
-from configparser import ConfigParser
-from glob import glob
-from shutil import copy2
-from subprocess import Popen, PIPE
 import hashlib
 import os
 import os.path
 
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from configparser import ConfigParser
+from subprocess import Popen, PIPE
 
 default_conf = """
 [DEFAULT]
